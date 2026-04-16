@@ -14,22 +14,9 @@
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <subviews>
-                            <!-- TT логотип по центру -->
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="center" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="TT" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" translatesAutoresizingMaskIntoConstraints="NO" id="logo-label">
-                                <rect key="frame" x="0.0" y="294" width="375" height="80"/>
-                                <fontDescription key="fontDescription" type="boldSystem" pointSize="64"/>
-                                <color key="textColor" white="1.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                                <nil key="highlightedColor"/>
-                            </label>
-                        </subviews>
+                        <subviews/>
                         <color key="backgroundColor" red="0.06667" green="0.06667" blue="0.06667" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                        <constraints>
-                            <constraint firstItem="logo-label" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="cx1"/>
-                            <constraint firstItem="logo-label" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="cy1"/>
-                            <constraint firstItem="logo-label" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="cl1"/>
-                            <constraint firstItem="Ze5-6b-2t3" firstAttribute="trailing" secondItem="logo-label" secondAttribute="trailing" id="cl2"/>
-                        </constraints>
+                        <constraints/>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                     </view>
                 </viewController>

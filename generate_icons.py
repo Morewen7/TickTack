@@ -1,54 +1,43 @@
-from PIL import Image, ImageDraw, ImageFont
-import os
+from PIL import Image, ImageDraw
+import os, json
 
-# Icon sizes required for iOS
 SIZES = [
     (20, 1), (20, 2), (20, 3),
     (29, 1), (29, 2), (29, 3),
     (40, 1), (40, 2), (40, 3),
     (60, 2), (60, 3),
     (76, 1), (76, 2),
-    (83, 2),  # 83.5 -> 167
+    (83, 2),
     (1024, 1),
 ]
 
 OUTPUT_DIR = "ios/TickTack/Images.xcassets/AppIcon.appiconset"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+def draw_tt_logo(draw, cx, cy, logo_h, color=(255, 255, 255)):
+    s = round(logo_h * 0.18)
+    tw = round(logo_h * 0.55)
+    stem1x_rel = (tw - s) // 2
+    t2start = stem1x_rel + s  # правая T сразу после стойки левой
+    stem2x_rel = t2start + (tw - s) // 2
+    total_w = t2start + tw
+
+    x0 = cx - total_w // 2
+    y0 = cy - logo_h // 2
+
+    # Левая T
+    draw.rectangle([x0, y0, x0 + tw, y0 + s], fill=color)
+    draw.rectangle([x0 + stem1x_rel, y0, x0 + stem1x_rel + s, y0 + logo_h], fill=color)
+
+    # Правая перевёрнутая T
+    draw.rectangle([x0 + t2start, y0 + logo_h - s, x0 + t2start + tw, y0 + logo_h], fill=color)
+    draw.rectangle([x0 + stem2x_rel, y0, x0 + stem2x_rel + s, y0 + logo_h], fill=color)
+
 def make_icon(size):
     img = Image.new("RGB", (size, size), color=(17, 17, 17))
     draw = ImageDraw.Draw(img)
-
-    font_size = int(size * 0.46)
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
-    except:
-        font = ImageFont.load_default()
-
-    # --- Normal "T" (right half) ---
-    t_bbox = draw.textbbox((0, 0), "T", font=font)
-    t_w = t_bbox[2] - t_bbox[0]
-    t_h = t_bbox[3] - t_bbox[1]
-    gap = int(size * 0.04)
-
-    total_w = t_w * 2 + gap
-    start_x = (size - total_w) / 2
-    y = (size - t_h) / 2 - t_bbox[1]
-
-    # Normal T
-    x1 = start_x - t_bbox[0]
-    draw.text((x1, y), "T", fill=(255, 255, 255), font=font)
-
-    # --- Flipped "T" (rendered separately, then rotated) ---
-    t_img = Image.new("RGBA", (t_w, t_h), (0, 0, 0, 0))
-    t_draw = ImageDraw.Draw(t_img)
-    t_draw.text((-t_bbox[0], -t_bbox[1]), "T", fill=(255, 255, 255), font=font)
-    t_flipped = t_img.rotate(180)
-
-    x2 = int(start_x + t_w + gap)
-    y2 = int((size - t_h) / 2)
-    img.paste(t_flipped, (x2, y2), t_flipped)
-
+    logo_h = int(size * 0.52)
+    draw_tt_logo(draw, size // 2, size // 2, logo_h)
     return img
 
 contents = {"images": [], "info": {"author": "xcode", "version": 1}}
@@ -59,9 +48,6 @@ for base_size, scale in SIZES:
     filename = f"icon_{base_size}x{base_size}@{scale}x.png"
     img.save(os.path.join(OUTPUT_DIR, filename))
 
-    size_str = f"{base_size}x{base_size}"
-    scale_str = f"{scale}x"
-
     idiom = "iphone"
     if base_size in [76, 83]:
         idiom = "ipad"
@@ -71,12 +57,11 @@ for base_size, scale in SIZES:
     contents["images"].append({
         "filename": filename,
         "idiom": idiom,
-        "scale": scale_str,
-        "size": size_str
+        "scale": f"{scale}x",
+        "size": f"{base_size}x{base_size}"
     })
 
-import json
 with open(os.path.join(OUTPUT_DIR, "Contents.json"), "w") as f:
     json.dump(contents, f, indent=2)
 
-print("Icons generated successfully!")
+print("Icons generated!")

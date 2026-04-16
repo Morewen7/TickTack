@@ -1,6 +1,7 @@
 import React, {useEffect, useRef} from 'react';
 import {Animated, StyleSheet, Text, View} from 'react-native';
 import {useTheme} from '../theme/ThemeContext';
+import {TTLogo} from '../components/TTLogo';
 
 interface Props {
   onFinish: () => void;
@@ -42,8 +43,8 @@ export function SplashScreen({onFinish}: Props) {
   return (
     <Animated.View
       style={[styles.container, {backgroundColor: colors.bg, opacity: fadeOut}]}>
-      <Animated.View style={{opacity, transform: [{scale}]}}>
-        <Text style={[styles.logo, {color: colors.textPrimary}]}>TT</Text>
+      <Animated.View style={[styles.content, {opacity, transform: [{scale}]}]}>
+        <TTLogo size={80} color={colors.textPrimary} />
         <Text style={[styles.sub, {color: colors.textMuted}]}>TickTack</Text>
       </Animated.View>
     </Animated.View>
@@ -57,12 +58,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 999,
   },
-  logo: {
-    fontSize: 80,
-    fontWeight: '800',
-    letterSpacing: -2,
-    textAlign: 'center',
-  },
+  content: {alignItems: 'center'},
   sub: {
     fontSize: 16,
     fontWeight: '400',

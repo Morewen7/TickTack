@@ -1,15 +1,18 @@
 import React, {useState, useEffect, useRef} from 'react';
+import Icon from 'react-native-vector-icons/Ionicons';
 import {
-  Alert, Modal, ScrollView, StatusBar, StyleSheet,
+  Alert, Image, Modal, ScrollView, Share, StatusBar, StyleSheet,
   Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {launchImageLibrary} from 'react-native-image-picker';
 import {GlassCard} from '../components/GlassCard';
 import {store} from '../store/remindersStore';
 import {useStore} from '../hooks/useStore';
 import {Radius, Spacing} from '../theme';
-import {useTheme} from '../theme/ThemeContext';
+import {useTheme, ACCENT_COLORS} from '../theme/ThemeContext';
+import {useLock} from '../hooks/useLock';
 
 interface Props {
   navigation: any;
@@ -55,9 +58,37 @@ const LIST_COLORS = [
   '#eab308', '#22c55e', '#3b82f6', '#a855f7',
 ];
 
+const LIST_ICONS = [
+  {name: 'list', label: '≡'},
+  {name: 'person', label: '♟'},
+  {name: 'briefcase-outline', label: '💼'},
+  {name: 'cart-outline', label: '🛒'},
+  {name: 'heart-outline', label: '♡'},
+  {name: 'star-outline', label: '☆'},
+  {name: 'home-outline', label: '⌂'},
+  {name: 'fitness-outline', label: '◎'},
+  {name: 'book-outline', label: '▣'},
+  {name: 'airplane-outline', label: '✈'},
+];
+
 export function SettingsScreen({navigation}: Props) {
   const insets = useSafeAreaInsets();
-  const {colors, mode, toggle} = useTheme();
+  const {colors, mode, toggle, backgroundImage, setBackgroundImage, accentColor, setAccentColor} = useTheme();
+  const {lockEnabled, enableLock} = useLock();
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+
+  const pickBackgroundImage = () => {
+    launchImageLibrary(
+      {mediaType: 'photo', quality: 0.8, copyTo: 'documentDirectory'},
+      response => {
+        if (response.didCancel || response.errorCode) return;
+        // Используем copyTo URI — постоянный путь в Documents, не очищается iOS
+        const uri = response.assets?.[0]?.uri ?? null;
+        if (uri) setBackgroundImage(uri);
+      },
+    );
+  };
   const {lists, reminders} = useStore();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [showAddList, setShowAddList] = useState(false);
@@ -79,6 +110,7 @@ export function SettingsScreen({navigation}: Props) {
   }, []);
   const [newListName, setNewListName] = useState('');
   const [newListColor, setNewListColor] = useState(LIST_COLORS[0]);
+  const [newListIcon, setNewListIcon] = useState(LIST_ICONS[0].name);
 
   useEffect(() => {
     loadSettings().then(setSettings);
@@ -99,7 +131,7 @@ export function SettingsScreen({navigation}: Props) {
         text: 'Очистить',
         style: 'destructive',
         onPress: () => {
-          reminders.filter(r => r.completed).forEach(r => store.deleteReminder(r.id));
+          reminders.filter(r => r.completed && !r.archived).forEach(r => store.deleteReminder(r.id));
         },
       },
     ]);
@@ -107,9 +139,10 @@ export function SettingsScreen({navigation}: Props) {
 
   const addList = () => {
     if (!newListName.trim()) return;
-    store.addList(newListName.trim(), newListColor, 'list');
+    store.addList(newListName.trim(), newListColor, newListIcon);
     setNewListName('');
     setNewListColor(LIST_COLORS[0]);
+    setNewListIcon(LIST_ICONS[0].name);
     setShowAddList(false);
   };
 
@@ -120,7 +153,24 @@ export function SettingsScreen({navigation}: Props) {
     ]);
   };
 
-  const completedCount = reminders.filter(r => r.completed).length;
+  const handleExport = async () => {
+    const json = store.exportData();
+    await Share.share({message: json, title: 'TickTack backup'});
+  };
+
+  const handleImport = async () => {
+    if (!importText.trim()) return;
+    const result = await store.importData(importText.trim());
+    setShowImport(false);
+    setImportText('');
+    if (result.error) {
+      Alert.alert('Ошибка', result.error);
+    } else {
+      Alert.alert('Готово', `Импортировано ${result.imported} напоминаний`);
+    }
+  };
+
+  const completedCount = reminders.filter(r => r.completed && !r.archived).length;
 
   const Row = ({label, right, onPress, borderBottom = true}: any) => {
     const Container = onPress ? TouchableOpacity : View;
@@ -155,7 +205,7 @@ export function SettingsScreen({navigation}: Props) {
         {/* Внешний вид */}
         <Text style={[styles.sectionLabel, {color: colors.textMuted}]}>Внешний вид</Text>
         <GlassCard style={styles.card}>
-          <View style={styles.row}>
+          <View style={[styles.row, {borderBottomWidth: 1, borderBottomColor: colors.separator}]}>
             <Text style={[styles.rowLabel, {color: colors.textPrimary}]}>Тёмная тема</Text>
             <Switch
               value={mode === 'dark'}
@@ -164,6 +214,37 @@ export function SettingsScreen({navigation}: Props) {
               thumbColor="#ffffff"
             />
           </View>
+          <View style={[styles.row, {borderBottomWidth: 1, borderBottomColor: colors.separator, flexDirection: 'column', alignItems: 'flex-start', paddingVertical: Spacing.md}]}>
+            <Text style={[styles.rowLabel, {color: colors.textPrimary, marginBottom: Spacing.sm}]}>Цвет акцента</Text>
+            <View style={styles.accentRow}>
+              {ACCENT_COLORS.map(({color}) => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    styles.accentDot,
+                    {backgroundColor: color},
+                    accentColor === color && styles.accentDotActive,
+                  ]}
+                  onPress={() => setAccentColor(color)}
+                />
+              ))}
+            </View>
+          </View>
+          <TouchableOpacity style={styles.row} onPress={pickBackgroundImage}>
+            <Text style={[styles.rowLabel, {color: colors.textPrimary}]}>Фото на фон</Text>
+            <View style={styles.bgPreviewRow}>
+              {backgroundImage ? (
+                <>
+                  <Image source={{uri: backgroundImage}} style={styles.bgThumb} />
+                  <TouchableOpacity onPress={() => setBackgroundImage(null)}>
+                    <Text style={[styles.bgRemove, {color: colors.priorityHigh}]}>Убрать</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={[styles.rowValue, {color: colors.textSecondary}]}>Выбрать</Text>
+              )}
+            </View>
+          </TouchableOpacity>
         </GlassCard>
 
         {/* Уведомления */}
@@ -244,18 +325,46 @@ export function SettingsScreen({navigation}: Props) {
           </TouchableOpacity>
         </GlassCard>
 
+        {/* Безопасность */}
+        <Text style={[styles.sectionLabel, {color: colors.textMuted}]}>Безопасность</Text>
+        <GlassCard style={styles.card}>
+          <View style={styles.row}>
+            <Text style={[styles.rowLabel, {color: colors.textPrimary}]}>Face ID / Touch ID</Text>
+            <Switch
+              value={lockEnabled}
+              onValueChange={enableLock}
+              trackColor={{false: colors.switchTrack, true: colors.accent}}
+              thumbColor="#ffffff"
+            />
+          </View>
+        </GlassCard>
+
         {/* Данные */}
         <Text style={[styles.sectionLabel, {color: colors.textMuted}]}>Данные</Text>
         <GlassCard style={styles.card}>
           <Row
-            label="Очистить выполненные"
-            borderBottom={false}
-            onPress={clearCompleted}
+            label="Архив"
+            borderBottom
+            onPress={() => navigation.navigate('Archive')}
             right={
               <View style={[styles.badge, {backgroundColor: colors.bgSecondary}]}>
-                <Text style={[styles.badgeText, {color: colors.textMuted}]}>{completedCount}</Text>
+                <Text style={[styles.badgeText, {color: colors.textMuted}]}>
+                  {reminders.filter(r => r.archived).length}
+                </Text>
               </View>
             }
+          />
+          <Row
+            label="Экспорт данных"
+            borderBottom
+            onPress={handleExport}
+            right={<Text style={[styles.rowValue, {color: colors.textSecondary}]}>JSON</Text>}
+          />
+          <Row
+            label="Импорт данных"
+            borderBottom
+            onPress={() => setShowImport(true)}
+            right={<Text style={[styles.rowValue, {color: colors.textSecondary}]}>Вставить</Text>}
           />
         </GlassCard>
       </ScrollView>
@@ -331,6 +440,38 @@ export function SettingsScreen({navigation}: Props) {
         </View>
       </Modal>
 
+      <Modal visible={showImport} transparent animationType="slide">
+        <View style={[styles.modalOverlay, {backgroundColor: colors.overlay}]}>
+          <GlassCard style={styles.modalCard}>
+            <Text style={[styles.modalTitle, {color: colors.textPrimary}]}>Импорт данных</Text>
+            <Text style={[styles.importHint, {color: colors.textMuted}]}>
+              Вставь JSON из экспорта TickTack
+            </Text>
+            <TextInput
+              style={[styles.importInput, {color: colors.textPrimary, backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder}]}
+              placeholder="Вставь JSON сюда..."
+              placeholderTextColor={colors.textMuted}
+              value={importText}
+              onChangeText={setImportText}
+              multiline
+              autoFocus
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={[styles.modalCancel, {backgroundColor: colors.bgSecondary}]}
+                onPress={() => { setShowImport(false); setImportText(''); }}>
+                <Text style={{color: colors.textSecondary, fontSize: 16}}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSave, {backgroundColor: colors.accent}]}
+                onPress={handleImport}>
+                <Text style={{color: colors.bg, fontSize: 16, fontWeight: '700'}}>Импорт</Text>
+              </TouchableOpacity>
+            </View>
+          </GlassCard>
+        </View>
+      </Modal>
+
       <Modal visible={showAddList} transparent animationType="slide">
         <View style={[styles.modalOverlay, {backgroundColor: colors.overlay}]}>
           <GlassCard style={styles.modalCard}>
@@ -354,6 +495,21 @@ export function SettingsScreen({navigation}: Props) {
                   ]}
                   onPress={() => setNewListColor(c)}
                 />
+              ))}
+            </View>
+            <Text style={[styles.modalSubtitle, {color: colors.textMuted}]}>Иконка</Text>
+            <View style={styles.colorPicker}>
+              {LIST_ICONS.map(({name, label}) => (
+                <TouchableOpacity
+                  key={name}
+                  style={[
+                    styles.iconBtn,
+                    {backgroundColor: newListIcon === name ? colors.accent + '33' : colors.bgSecondary,
+                     borderColor: newListIcon === name ? colors.accent : colors.cardBorder},
+                  ]}
+                  onPress={() => setNewListIcon(name)}>
+                  <Icon name={name} size={18} color={newListIcon === name ? colors.accent : colors.textMuted} />
+                </TouchableOpacity>
               ))}
             </View>
             <View style={styles.modalBtns}>
@@ -408,6 +564,18 @@ const styles = StyleSheet.create({
   listRow: {flexDirection: 'row', alignItems: 'center', gap: Spacing.sm},
   listDot: {width: 10, height: 10, borderRadius: 5},
   deleteText: {fontSize: 14},
+  importHint: {fontSize: 13, marginBottom: Spacing.sm},
+  importInput: {
+    borderWidth: 1, borderRadius: 12, padding: 12,
+    fontSize: 13, minHeight: 120, textAlignVertical: 'top',
+    marginBottom: Spacing.md,
+  },
+  accentRow: {flexDirection: 'row', gap: 10, flexWrap: 'wrap'},
+  accentDot: {width: 32, height: 32, borderRadius: 16},
+  accentDotActive: {borderWidth: 3, borderColor: 'rgba(255,255,255,0.8)', transform: [{scale: 1.15}]},
+  bgPreviewRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  bgThumb: {width: 36, height: 36, borderRadius: 6},
+  bgRemove: {fontSize: 14},
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -416,7 +584,8 @@ const styles = StyleSheet.create({
   badgeText: {fontSize: 14},
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingTop: 120,
     padding: Spacing.md,
   },
   modalCard: {padding: Spacing.lg},
@@ -434,6 +603,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   colorDot: {width: 30, height: 30, borderRadius: 15},
+  modalSubtitle: {fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4},
+  iconBtn: {width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center'},
   modalBtns: {flexDirection: 'row', gap: Spacing.md},
   timePicker: {
     flexDirection: 'row',

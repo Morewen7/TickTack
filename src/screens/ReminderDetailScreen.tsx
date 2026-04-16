@@ -9,6 +9,7 @@ import {useStore} from '../hooks/useStore';
 import {store} from '../store/remindersStore';
 import {Radius, Spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
+import {haptics} from '../utils/haptics';
 
 interface Props {
   navigation: any;
@@ -55,6 +56,11 @@ export function ReminderDetailScreen({navigation, route}: Props) {
     ]);
   };
 
+  const handleArchive = () => {
+    store.archiveReminder(reminderId);
+    navigation.goBack();
+  };
+
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('ru', {
       day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
@@ -76,6 +82,9 @@ export function ReminderDetailScreen({navigation, route}: Props) {
             <TouchableOpacity onPress={() => navigation.navigate('AddReminder', {reminder})}>
               <Text style={[styles.editBtn, {color: colors.accent}]}>Изменить</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={handleArchive}>
+              <Text style={[styles.archiveBtn, {color: colors.textMuted}]}>В архив</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleDelete}>
               <Text style={[styles.deleteBtn, {color: colors.priorityHigh}]}>Удалить</Text>
             </TouchableOpacity>
@@ -89,7 +98,7 @@ export function ReminderDetailScreen({navigation, route}: Props) {
               {borderColor: PRIORITY_COLOR[reminder.priority]},
               reminder.completed && {backgroundColor: PRIORITY_COLOR[reminder.priority]},
             ]}
-            onPress={() => store.toggleReminder(reminder.id)}>
+            onPress={() => { haptics.success(); store.toggleReminder(reminder.id); }}>
             {reminder.completed && (
               <Text style={[styles.checkmark, {color: colors.bg}]}>✓</Text>
             )}
@@ -107,6 +116,16 @@ export function ReminderDetailScreen({navigation, route}: Props) {
         {reminder.note ? (
           <Text style={[styles.note, {color: colors.textSecondary}]}>{reminder.note}</Text>
         ) : null}
+
+        {reminder.tags?.length > 0 && (
+          <View style={styles.tagsRow}>
+            {reminder.tags.map(tag => (
+              <View key={tag} style={[styles.tagChip, {backgroundColor: colors.card, borderColor: colors.cardBorder}]}>
+                <Text style={[styles.tagText, {color: colors.textMuted}]}>#{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <GlassCard style={styles.infoCard}>
           <View style={styles.infoRow}>
@@ -201,6 +220,7 @@ const styles = StyleSheet.create({
   navBack: {fontSize: 16},
   navRight: {flexDirection: 'row', gap: Spacing.md, alignItems: 'center'},
   editBtn: {fontSize: 16},
+  archiveBtn: {fontSize: 15},
   deleteBtn: {fontSize: 16},
   titleBlock: {
     flexDirection: 'row',
@@ -220,7 +240,15 @@ const styles = StyleSheet.create({
   checkmark: {fontSize: 13, fontWeight: '600'},
   title: {flex: 1, fontSize: 26, fontWeight: '700', lineHeight: 32},
   titleCompleted: {opacity: 0.35, textDecorationLine: 'line-through'},
-  note: {fontSize: 15, lineHeight: 22, marginBottom: Spacing.lg},
+  note: {fontSize: 15, lineHeight: 22, marginBottom: Spacing.sm},
+  tagsRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.lg},
+  tagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  tagText: {fontSize: 13},
   infoCard: {marginBottom: Spacing.md},
   infoRow: {
     flexDirection: 'row',

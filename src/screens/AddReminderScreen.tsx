@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {GlassCard} from '../components/GlassCard';
-import {Priority, RepeatInterval, store, SubTask} from '../store/remindersStore';
+import {Priority, RepeatInterval, ReminderLocation, store, SubTask} from '../store/remindersStore';
+import Icon from 'react-native-vector-icons/Ionicons';
+import {haptics} from '../utils/haptics';
 import {Radius, Spacing} from '../theme';
 import {useTheme} from '../theme/ThemeContext';
 import uuid from 'react-native-uuid';
@@ -54,6 +56,9 @@ export function AddReminderScreen({navigation, route}: Props) {
   );
   const [subtasks, setSubtasks] = useState<SubTask[]>(editReminder?.subtasks ?? []);
   const [newSubtask, setNewSubtask] = useState('');
+  const [tags, setTags] = useState<string[]>(editReminder?.tags ?? []);
+  const [newTag, setNewTag] = useState('');
+  const [location, setLocation] = useState<ReminderLocation | undefined>(editReminder?.location);
 
   const handleDateToggle = (val: boolean) => {
     setHasDate(val);
@@ -79,8 +84,16 @@ export function AddReminderScreen({navigation, route}: Props) {
     setNewSubtask('');
   };
 
+  const addTag = () => {
+    const tag = newTag.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!tag || tags.includes(tag)) { setNewTag(''); return; }
+    setTags(prev => [...prev, tag]);
+    setNewTag('');
+  };
+
   const handleSave = () => {
     if (!title.trim()) return;
+    haptics.success();
     if (isEditing) {
       store.updateReminder(editReminder.id, {
         title: title.trim(),
@@ -89,6 +102,8 @@ export function AddReminderScreen({navigation, route}: Props) {
         dueDate: dueDate ? dueDate.toISOString() : null,
         repeat,
         subtasks,
+        tags,
+        location,
       });
       // Перепланируем уведомление
       if (dueDate) {
@@ -107,7 +122,10 @@ export function AddReminderScreen({navigation, route}: Props) {
         dueDate: dueDate ? dueDate.toISOString() : null,
         repeat,
         subtasks,
+        tags,
+        location,
         completed: false,
+        archived: false,
       });
     }
     navigation.goBack();
@@ -243,6 +261,59 @@ export function AddReminderScreen({navigation, route}: Props) {
             ))}
           </GlassCard>
 
+          {/* Tags */}
+          <Text style={[styles.sectionLabel, {color: colors.textMuted}]}>Теги</Text>
+          <GlassCard style={styles.card}>
+            {tags.length > 0 && (
+              <View style={styles.tagsRow}>
+                {tags.map(tag => (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[styles.tagChip, {backgroundColor: colors.accent + '18', borderColor: colors.accent + '44'}]}
+                    onPress={() => setTags(prev => prev.filter(t => t !== tag))}>
+                    <Text style={[styles.tagText, {color: colors.accent}]}>#{tag}</Text>
+                    <Icon name="close" size={11} color={colors.accent} style={{opacity: 0.6}} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <View style={styles.addSubtaskRow}>
+              <TextInput
+                style={[styles.subtaskInput, {color: colors.textPrimary}]}
+                placeholder="Добавить тег"
+                placeholderTextColor={colors.textMuted}
+                value={newTag}
+                onChangeText={setNewTag}
+                onSubmitEditing={addTag}
+                returnKeyType="done"
+                autoCapitalize="none"
+              />
+              {newTag.length > 0 && (
+                <TouchableOpacity onPress={addTag}>
+                  <Text style={[styles.addBtn, {color: colors.accent}]}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </GlassCard>
+
+          {/* Location */}
+          <Text style={[styles.sectionLabel, {color: colors.textMuted}]}>Напомнить по месту</Text>
+          <GlassCard style={styles.card}>
+            <TouchableOpacity
+              style={styles.locationRow}
+              onPress={() => navigation.navigate('LocationPicker', {onSave: setLocation})}>
+              <Icon name="location-outline" size={18} color={location ? colors.accent : colors.textMuted} />
+              <Text style={[styles.locationText, {color: location ? colors.accent : colors.textMuted}]}>
+                {location ? `${location.name} · ${location.radius}м · ${location.onArrive ? 'при прибытии' : 'при отъезде'}` : 'Добавить место'}
+              </Text>
+              {location && (
+                <TouchableOpacity onPress={() => setLocation(undefined)}>
+                  <Icon name="close-circle" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+          </GlassCard>
+
           {/* Subtasks */}
           <Text style={[styles.sectionLabel, {color: colors.textMuted}]}>Подзадачи</Text>
           <GlassCard style={styles.card}>
@@ -326,6 +397,11 @@ const styles = StyleSheet.create({
   },
   rowLabel: {fontSize: 16},
   check: {fontSize: 16, fontWeight: '600'},
+  locationRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    paddingHorizontal: Spacing.md, paddingVertical: 14,
+  },
+  locationText: {flex: 1, fontSize: 15},
   subtaskRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -345,6 +421,23 @@ const styles = StyleSheet.create({
   },
   subtaskInput: {flex: 1, fontSize: 15},
   addBtn: {fontSize: 24, paddingHorizontal: Spacing.sm},
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    gap: 8,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  tagText: {fontSize: 13, fontWeight: '500'},
   divider: {height: 1, marginHorizontal: Spacing.md},
   pickerRow: {
     flexDirection: 'row',

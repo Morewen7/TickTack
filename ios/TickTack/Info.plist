@@ -32,7 +32,13 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>TickTack использует геолокацию чтобы напомнить о задаче когда ты окажешься в нужном месте</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>TickTack использует геолокацию в фоне чтобы отправить напоминание по месту</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>TickTack использует Face ID для защиты твоих данных</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>TickTack использует фото для фона приложения</string>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>TickTack отправляет уведомления чтобы напомнить о важных делах</string>
 	<key>UIAppFonts</key>

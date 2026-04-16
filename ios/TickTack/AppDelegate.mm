@@ -1,17 +1,22 @@
 #import "AppDelegate.h"
 
 #import <React/RCTBundleURLProvider.h>
+#import <React/RCTRootView.h>
 
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
   self.moduleName = @"TickTack";
-  // You can add your custom initial props in the dictionary below.
-  // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
+}
+
+// Устанавливаем цвет фона до того, как RN отрендерится — убирает белый/серый вспых
+- (void)customizeRootView:(RCTRootView *)rootView
+{
+  rootView.backgroundColor = [UIColor colorWithRed:0.067 green:0.067 blue:0.067 alpha:1.0];
 }
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
