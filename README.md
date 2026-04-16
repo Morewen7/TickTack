@@ -1,79 +1,114 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# TickTack
 
-# Getting Started
+**The smart reminder app that works the way your brain does.**
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+Available on iOS and Android.
 
-## Step 1: Start the Metro Server
+---
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+## What is TickTack?
 
-To start Metro, run the following command from the _root_ of your React Native project:
+TickTack is a modern, privacy-first reminder and task management app built for people who want to stay on top of their life — without the clutter of overcomplicated productivity tools.
 
-```bash
-# using npm
-npm start
+Where most apps drown you in features you never use, TickTack focuses on one thing: making sure you remember what matters, exactly when and where it matters.
 
-# OR using Yarn
-yarn start
-```
+---
 
-## Step 2: Start your Application
+## Why TickTack?
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
+The global productivity app market is worth **$102 billion** and growing. Yet the most common complaint about existing apps — Todoist, Reminders, Any.do — is that they're either too simple or too complex. There's a massive gap in the market for an app that feels premium, works intelligently, and respects user privacy.
 
-### For Android
+TickTack fills that gap.
 
-```bash
-# using npm
-npm run android
+---
 
-# OR using Yarn
-yarn android
-```
+## Key Features
 
-### For iOS
+### Smart Reminders
+Set reminders by time, date, and repeat schedule. Daily, weekly — TickTack keeps track so you don't have to.
 
-```bash
-# using npm
-npm run ios
+### Location-Based Reminders
+Get reminded when you *arrive at* or *leave* a specific place. Walking past the grocery store? TickTack reminds you to buy milk before you've even thought about it.
 
-# OR using Yarn
-yarn ios
-```
+### Notification Actions
+Complete or snooze a reminder directly from the notification — without even opening the app. One tap and it's done.
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+### Drag & Drop Prioritization
+Organize your tasks in the order that makes sense to you. Just hold and drag.
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
+### Multiple Lists
+Separate your work, personal, shopping, and custom lists with color coding and icons. Everything in its place.
 
-## Step 3: Modifying your App
+### Subtasks
+Break big goals into smaller steps. Track progress on each one.
 
-Now that you have successfully run the app, let's modify it.
+### Archive
+Completed something important? Archive it instead of deleting — your history stays intact.
 
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
+### Statistics
+See how productive you've been. Track completion rates, streaks, and patterns over time.
 
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
+### Face ID / Touch ID Lock
+Your tasks are private. TickTack locks itself behind biometric authentication so only you can access your data.
 
-## Congratulations! :tada:
+### Dark & Light Mode
+Switches smoothly with a beautiful fade animation. Accent color is fully customizable — 8 colors to choose from.
 
-You've successfully run and modified your React Native App. :partying_face:
+### Custom Background
+Set your own photo as the app background. Make it yours.
 
-### Now what?
+### Export & Import
+Your data belongs to you. Export everything as JSON, import it anywhere.
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
+### iOS Widget
+See your upcoming tasks right on your home screen without opening the app.
 
-# Troubleshooting
+### Spotlight Search (iOS)
+Find any reminder instantly via iOS system search.
 
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+---
 
-# Learn More
+## Technology
 
-To learn more about React Native, take a look at the following resources:
+TickTack is built with **React Native** — a single codebase powering both iOS and Android. This means faster development, consistent experience across platforms, and significantly lower engineering costs compared to building two separate native apps.
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- **Frontend:** React Native 0.76, TypeScript
+- **Storage:** Local-first with AsyncStorage — no account required, no data sent to servers
+- **Notifications:** Notifee — rich notifications with actions on both platforms
+- **Biometrics:** react-native-biometrics — Face ID, Touch ID, Fingerprint
+- **Location:** Native geolocation with background monitoring
+- **Animations:** React Native Reanimated — smooth, 60fps interactions
+- **iOS Widget:** WidgetKit (Swift) with App Group data sharing
+
+---
+
+## Privacy First
+
+TickTack stores all data **locally on your device**. No account required. No cloud sync. No tracking. No ads. Your reminders never leave your phone unless you choose to export them yourself.
+
+This is increasingly a competitive advantage — users are tired of apps that monetize their personal data.
+
+---
+
+## Business Model
+
+**Freemium:**
+- Free tier: full core functionality, up to 3 lists
+- Pro ($2.99/month or $19.99/year): unlimited lists, widget, location reminders, Face ID, statistics, custom themes
+
+**Target audience:**
+- Age 18–45, smartphone-native users
+- Students, professionals, freelancers
+- People who tried other apps and gave up on them
+
+---
+
+## Traction
+
+- Full-featured app built and shipped to both iOS and Android
+- Complete feature parity across platforms
+- Zero backend infrastructure costs — pure client-side, no servers to maintain
+
+---
+
+*TickTack — Remember everything. Miss nothing.*
