@@ -359,17 +359,13 @@ export function HomeScreen({navigation}: Props) {
                   Выполнено ({completed.length})
                 </Text>
               </View>
-              <FlatList
-                data={completed}
-                keyExtractor={item => item.id}
-                renderItem={({item}) => (
-                  <ReminderItem
-                    reminder={item}
-                    onPress={id => navigation.navigate('ReminderDetail', {reminderId: id})}
-                  />
-                )}
-                scrollEnabled={false}
-              />
+              {completed.map(item => (
+                <ReminderItem
+                  key={item.id}
+                  reminder={item}
+                  onPress={id => navigation.navigate('ReminderDetail', {reminderId: id})}
+                />
+              ))}
             </>
           )}
         </GlassCard>

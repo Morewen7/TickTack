@@ -6,6 +6,7 @@ import notifee, {
   TriggerType,
   AuthorizationStatus,
 } from '@notifee/react-native';
+import {Platform} from 'react-native';
 import {Reminder} from '../store/remindersStore';
 
 const CHANNEL_ID = 'ticktack';
@@ -76,7 +77,8 @@ export async function scheduleNotification(reminder: Reminder): Promise<void> {
 }
 
 export async function setupNotificationActions(): Promise<void> {
-  // iOS категория с кнопками действий
+  // setNotificationCategories доступен только на iOS
+  if (Platform.OS !== 'ios') return;
   await notifee.setNotificationCategories([
     {
       id: 'reminder_actions',

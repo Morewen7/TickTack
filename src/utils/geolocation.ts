@@ -2,17 +2,38 @@ import Geolocation from '@react-native-community/geolocation';
 import {Alert, PermissionsAndroid, Platform} from 'react-native';
 import {ReminderLocation} from '../store/remindersStore';
 
-export function requestLocationPermission(): Promise<boolean> {
-  return new Promise(resolve => {
-    if (Platform.OS === 'ios') {
-      Geolocation.requestAuthorization('whenInUse');
-      resolve(true);
-      return;
-    }
-    PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-    ).then(result => resolve(result === 'granted'));
-  });
+export async function requestLocationPermission(): Promise<boolean> {
+  if (Platform.OS === 'ios') {
+    Geolocation.requestAuthorization('whenInUse');
+    return true;
+  }
+
+  const fine = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    {
+      title: 'Геолокация',
+      message: 'TickTack использует геолокацию чтобы напомнить о задаче в нужном месте',
+      buttonPositive: 'Разрешить',
+      buttonNegative: 'Отмена',
+    },
+  );
+  if (fine !== 'granted') return false;
+
+  // Android 10+ требует отдельного разрешения на фоновую геолокацию
+  if (Platform.Version >= 29) {
+    const bg = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+      {
+        title: 'Фоновая геолокация',
+        message: 'Разреши доступ к геолокации "Всегда" чтобы получать напоминания по месту в фоне',
+        buttonPositive: 'Разрешить',
+        buttonNegative: 'Потом',
+      },
+    );
+    return bg === 'granted';
+  }
+
+  return true;
 }
 
 export function getCurrentLocation(): Promise<{latitude: number; longitude: number}> {

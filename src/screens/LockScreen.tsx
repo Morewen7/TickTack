@@ -85,9 +85,16 @@ export function LockScreen({onUnlock}: Props) {
             <Text style={[styles.bioLabel, {color: colors.textSecondary}]}>{biometryLabel}</Text>
           </TouchableOpacity>
         ) : (
-          <Text style={[styles.noBio, {color: colors.textMuted}]}>
-            Биометрия недоступна на этом устройстве
-          </Text>
+          <>
+            <Text style={[styles.noBio, {color: colors.textMuted}]}>
+              Биометрия недоступна на этом устройстве
+            </Text>
+            <TouchableOpacity
+              style={[styles.bypassBtn, {backgroundColor: colors.accent}]}
+              onPress={onUnlock}>
+              <Text style={[styles.bypassLabel, {color: colors.bg}]}>Войти</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
     </Animated.View>
@@ -128,4 +135,6 @@ const styles = StyleSheet.create({
   bioIcon: {fontSize: 56},
   bioLabel: {fontSize: 15},
   noBio: {fontSize: 14, textAlign: 'center', paddingHorizontal: 40},
+  bypassBtn: {marginTop: 16, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 24},
+  bypassLabel: {fontSize: 16, fontWeight: '600'},
 });
