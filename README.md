@@ -1,114 +1,104 @@
 # TickTack
 
-**The smart reminder app that works the way your brain does.**
+**Умное приложение для напоминаний, которое работает так, как думает твой мозг.**
 
-Available on iOS and Android.
-
----
-
-## What is TickTack?
-
-TickTack is a modern, privacy-first reminder and task management app built for people who want to stay on top of their life — without the clutter of overcomplicated productivity tools.
-
-Where most apps drown you in features you never use, TickTack focuses on one thing: making sure you remember what matters, exactly when and where it matters.
+Доступно для iOS и Android.
 
 ---
 
-## Why TickTack?
+## Скриншоты
 
-The global productivity app market is worth **$102 billion** and growing. Yet the most common complaint about existing apps — Todoist, Reminders, Any.do — is that they're either too simple or too complex. There's a massive gap in the market for an app that feels premium, works intelligently, and respects user privacy.
-
-TickTack fills that gap.
-
----
-
-## Key Features
-
-### Smart Reminders
-Set reminders by time, date, and repeat schedule. Daily, weekly — TickTack keeps track so you don't have to.
-
-### Location-Based Reminders
-Get reminded when you *arrive at* or *leave* a specific place. Walking past the grocery store? TickTack reminds you to buy milk before you've even thought about it.
-
-### Notification Actions
-Complete or snooze a reminder directly from the notification — without even opening the app. One tap and it's done.
-
-### Drag & Drop Prioritization
-Organize your tasks in the order that makes sense to you. Just hold and drag.
-
-### Multiple Lists
-Separate your work, personal, shopping, and custom lists with color coding and icons. Everything in its place.
-
-### Subtasks
-Break big goals into smaller steps. Track progress on each one.
-
-### Archive
-Completed something important? Archive it instead of deleting — your history stays intact.
-
-### Statistics
-See how productive you've been. Track completion rates, streaks, and patterns over time.
-
-### Face ID / Touch ID Lock
-Your tasks are private. TickTack locks itself behind biometric authentication so only you can access your data.
-
-### Dark & Light Mode
-Switches smoothly with a beautiful fade animation. Accent color is fully customizable — 8 colors to choose from.
-
-### Custom Background
-Set your own photo as the app background. Make it yours.
-
-### Export & Import
-Your data belongs to you. Export everything as JSON, import it anywhere.
-
-### iOS Widget
-See your upcoming tasks right on your home screen without opening the app.
-
-### Spotlight Search (iOS)
-Find any reminder instantly via iOS system search.
+<p align="center">
+  <img src="image.png" alt="TickTack — геолокационные напоминания" width="320"/>
+</p>
 
 ---
 
-## Technology
+## Что такое TickTack?
 
-TickTack is built with **React Native** — a single codebase powering both iOS and Android. This means faster development, consistent experience across platforms, and significantly lower engineering costs compared to building two separate native apps.
+TickTack — современное приложение для напоминаний и управления задачами, созданное для тех, кто хочет держать жизнь под контролем без лишнего шума перегруженных инструментов продуктивности.
+
+Там, где другие приложения тонут в ненужных функциях, TickTack сосредоточен на одном: чтобы ты помнил важное именно тогда и там, где это нужно.
+
+---
+
+## Ключевые возможности
+
+### Умные напоминания
+Устанавливай напоминания по времени, дате и расписанию повторения. Ежедневно, еженедельно — TickTack следит за этим вместо тебя.
+
+### Геолокационные напоминания
+Получай уведомление, когда *прибываешь* или *уходишь* с определённого места. Проходишь мимо магазина? TickTack напомнит купить молоко раньше, чем ты об этом подумаешь.
+
+### Действия в уведомлениях
+Выполни или отложи напоминание прямо из уведомления — не открывая приложение. Один тап — и готово.
+
+### Перетаскивание для приоритизации
+Расставляй задачи в удобном порядке — просто удержи и перетащи.
+
+### Несколько списков
+Разделяй рабочие, личные, покупки и кастомные списки с цветовой кодировкой и иконками. Всё на своём месте.
+
+### Подзадачи
+Разбивай большие цели на маленькие шаги. Отслеживай прогресс по каждому.
+
+### Архив
+Выполнил важное? Заархивируй вместо удаления — история сохранится.
+
+### Статистика
+Следи за своей продуктивностью. Процент выполнения, серии, паттерны.
+
+### Блокировка по Face ID / Touch ID
+Твои задачи — личные. TickTack закрывается биометрической аутентификацией, доступ только у тебя.
+
+### Тёмная и светлая тема
+Плавное переключение с красивой анимацией. Акцентный цвет — на выбор из 8 вариантов.
+
+### Кастомный фон
+Установи своё фото как фон приложения. Сделай его своим.
+
+### Экспорт и импорт
+Твои данные принадлежат тебе. Экспортируй всё в JSON, импортируй куда угодно.
+
+### Виджет для iOS
+Видь предстоящие задачи прямо на экране домой — без открытия приложения.
+
+### Поиск через Spotlight (iOS)
+Мгновенно найди любое напоминание через системный поиск iOS.
+
+---
+
+## Технологии
+
+TickTack построен на **React Native** — одна кодовая база для iOS и Android. Это значит более быструю разработку, единый опыт на обеих платформах и существенно меньшие затраты по сравнению с двумя нативными приложениями.
 
 - **Frontend:** React Native 0.76, TypeScript
-- **Storage:** Local-first with AsyncStorage — no account required, no data sent to servers
-- **Notifications:** Notifee — rich notifications with actions on both platforms
-- **Biometrics:** react-native-biometrics — Face ID, Touch ID, Fingerprint
-- **Location:** Native geolocation with background monitoring
-- **Animations:** React Native Reanimated — smooth, 60fps interactions
-- **iOS Widget:** WidgetKit (Swift) with App Group data sharing
+- **Хранилище:** Локальное на устройстве через AsyncStorage — аккаунт не нужен, данные на серверы не отправляются
+- **Уведомления:** Notifee — расширенные уведомления с действиями на обеих платформах
+- **Биометрия:** react-native-biometrics — Face ID, Touch ID, отпечаток пальца
+- **Геолокация:** Нативная геолокация с фоновым мониторингом
+- **Анимации:** React Native Reanimated — плавные взаимодействия на 60fps
+- **Виджет iOS:** WidgetKit (Swift) с обменом данными через App Group
 
 ---
 
-## Privacy First
+## Приватность прежде всего
 
-TickTack stores all data **locally on your device**. No account required. No cloud sync. No tracking. No ads. Your reminders never leave your phone unless you choose to export them yourself.
-
-This is increasingly a competitive advantage — users are tired of apps that monetize their personal data.
+TickTack хранит все данные **локально на устройстве**. Аккаунт не нужен. Никакой облачной синхронизации. Никакой слежки. Никакой рекламы. Твои напоминания никогда не покидают телефон, если ты сам не экспортируешь их.
 
 ---
 
-## Business Model
+## Бизнес-модель
 
 **Freemium:**
-- Free tier: full core functionality, up to 3 lists
-- Pro ($2.99/month or $19.99/year): unlimited lists, widget, location reminders, Face ID, statistics, custom themes
+- Бесплатно: полный базовый функционал, до 3 списков
+- Pro (299 ₽/месяц или 1 990 ₽/год): безлимитные списки, виджет, геолокационные напоминания, Face ID, статистика, кастомные темы
 
-**Target audience:**
-- Age 18–45, smartphone-native users
-- Students, professionals, freelancers
-- People who tried other apps and gave up on them
-
----
-
-## Traction
-
-- Full-featured app built and shipped to both iOS and Android
-- Complete feature parity across platforms
-- Zero backend infrastructure costs — pure client-side, no servers to maintain
+**Целевая аудитория:**
+- Возраст 18–45, активные пользователи смартфонов
+- Студенты, специалисты, фрилансеры
+- Те, кто пробовал другие приложения и бросил
 
 ---
 
-*TickTack — Remember everything. Miss nothing.*
+*TickTack — Помни всё. Не пропусти ничего.*
