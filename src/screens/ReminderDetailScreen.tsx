@@ -1,8 +1,9 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import {
   Alert, ScrollView, StatusBar, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {GlassCard} from '../components/GlassCard';
 import {useStore} from '../hooks/useStore';
@@ -31,8 +32,13 @@ export function ReminderDetailScreen({navigation, route}: Props) {
   const {reminders} = useStore();
   const reminder = reminders.find(r => r.id === reminderId);
 
+  useEffect(() => {
+    if (!reminder) {
+      navigation.goBack();
+    }
+  }, [reminder, navigation]);
+
   if (!reminder) {
-    navigation.goBack();
     return null;
   }
 
@@ -75,18 +81,25 @@ export function ReminderDetailScreen({navigation, route}: Props) {
           {paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.xl},
         ]}>
         <View style={styles.nav}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={[styles.navBack, {color: colors.textSecondary}]}>← Назад</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBackBtn}>
+            <Icon name="chevron-back" size={18} color={colors.textSecondary} />
+            <Text style={[styles.navBack, {color: colors.textSecondary}]}>Назад</Text>
           </TouchableOpacity>
           <View style={styles.navRight}>
-            <TouchableOpacity onPress={() => navigation.navigate('AddReminder', {reminder})}>
-              <Text style={[styles.editBtn, {color: colors.accent}]}>Изменить</Text>
+            <TouchableOpacity
+              style={[styles.navIconBtn, {backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder}]}
+              onPress={() => navigation.push('AddReminder', {reminder})}>
+              <Icon name="pencil-outline" size={16} color={colors.accent} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleArchive}>
-              <Text style={[styles.archiveBtn, {color: colors.textMuted}]}>В архив</Text>
+            <TouchableOpacity
+              style={[styles.navIconBtn, {backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder}]}
+              onPress={handleArchive}>
+              <Icon name="archive-outline" size={16} color={colors.textMuted} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleDelete}>
-              <Text style={[styles.deleteBtn, {color: colors.priorityHigh}]}>Удалить</Text>
+            <TouchableOpacity
+              style={[styles.navIconBtn, {backgroundColor: colors.bgSecondary, borderColor: colors.cardBorder}]}
+              onPress={handleDelete}>
+              <Icon name="trash-outline" size={16} color={colors.priorityHigh} />
             </TouchableOpacity>
           </View>
         </View>
@@ -116,16 +129,6 @@ export function ReminderDetailScreen({navigation, route}: Props) {
         {reminder.note ? (
           <Text style={[styles.note, {color: colors.textSecondary}]}>{reminder.note}</Text>
         ) : null}
-
-        {reminder.tags?.length > 0 && (
-          <View style={styles.tagsRow}>
-            {reminder.tags.map(tag => (
-              <View key={tag} style={[styles.tagChip, {backgroundColor: colors.card, borderColor: colors.cardBorder}]}>
-                <Text style={[styles.tagText, {color: colors.textMuted}]}>#{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
 
         <GlassCard style={styles.infoCard}>
           <View style={styles.infoRow}>
@@ -217,11 +220,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xl,
   },
-  navBack: {fontSize: 16},
-  navRight: {flexDirection: 'row', gap: Spacing.md, alignItems: 'center'},
-  editBtn: {fontSize: 16},
-  archiveBtn: {fontSize: 15},
-  deleteBtn: {fontSize: 16},
+  navBackBtn: {flexDirection: 'row', alignItems: 'center', gap: 2},
+  navBack: {fontSize: 15},
+  navRight: {flexDirection: 'row', gap: Spacing.sm, alignItems: 'center'},
+  navIconBtn: {
+    width: 34, height: 34, borderRadius: Radius.full,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
   titleBlock: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -241,14 +246,6 @@ const styles = StyleSheet.create({
   title: {flex: 1, fontSize: 26, fontWeight: '700', lineHeight: 32},
   titleCompleted: {opacity: 0.35, textDecorationLine: 'line-through'},
   note: {fontSize: 15, lineHeight: 22, marginBottom: Spacing.sm},
-  tagsRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.lg},
-  tagChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  tagText: {fontSize: 13},
   infoCard: {marginBottom: Spacing.md},
   infoRow: {
     flexDirection: 'row',

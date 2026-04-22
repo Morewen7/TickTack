@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {NativeModules} from 'react-native';
 import uuid from 'react-native-uuid';
-import {scheduleNotification, cancelNotification} from '../utils/notifications';
+import {scheduleNotification, cancelNotification, refreshBadge} from '../utils/notifications';
 
 const {AppGroupBridge, SpotlightBridge} = NativeModules;
 
@@ -33,8 +33,8 @@ export interface Reminder {
   subtasks: SubTask[];
   completed: boolean;
   archived: boolean;
-  tags: string[];
   createdAt: string;
+  completedAt?: string; // ISO string, заполняется при выполнении
   location?: ReminderLocation;
 }
 
@@ -43,6 +43,7 @@ export interface ReminderList {
   name: string;
   color: string;
   icon: string;
+  private?: boolean;
 }
 
 export interface AppState {
@@ -74,13 +75,14 @@ class RemindersStore {
         this.state = {
           reminders: (saved.reminders || []).map((r: any) => ({
             archived: false,
-            tags: [],
             ...r,
           })),
           lists: saved.lists || defaultLists,
         };
       }
-    } catch {}
+    } catch (e) {
+      if (__DEV__) { console.error('[RemindersStore] load failed:', e); }
+    }
     this.notify();
   }
 
@@ -89,7 +91,16 @@ class RemindersStore {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
       this.syncWidget();
       this.syncSpotlight();
-    } catch {}
+      refreshBadge(this.state.reminders).catch(() => {});
+    } catch (e) {
+      if (__DEV__) { console.error('[RemindersStore] save failed:', e); }
+    }
+  }
+
+  /** Принудительно отправляет актуальное состояние в виджет и Spotlight. */
+  refreshSync() {
+    this.syncWidget();
+    this.syncSpotlight();
   }
 
   private syncWidget() {
@@ -118,7 +129,11 @@ class RemindersStore {
   }
 
   private notify() {
-    this.listeners.forEach(l => l());
+    this.listeners.forEach(l => {
+      try { l(); } catch (e) {
+        if (__DEV__) { console.error('[RemindersStore] listener error:', e); }
+      }
+    });
   }
 
   getState(): AppState {
@@ -129,7 +144,6 @@ class RemindersStore {
     const reminder: Reminder = {
       ...data,
       archived: data.archived ?? false,
-      tags: data.tags ?? [],
       id: uuid.v4() as string,
       createdAt: new Date().toISOString(),
     };
@@ -169,12 +183,17 @@ class RemindersStore {
 
   toggleReminder(id: string) {
     const reminder = this.state.reminders.find(r => r.id === id);
-    if (reminder) {
-      // Если выполнено — отменяем уведомление
-      if (!reminder.completed) {
-        cancelNotification(id).catch(() => {});
+    if (!reminder) return;
+    if (!reminder.completed) {
+      // Отмечаем выполненным — фиксируем время выполнения, отменяем уведомление
+      cancelNotification(id).catch(() => {});
+      this.updateReminder(id, {completed: true, completedAt: new Date().toISOString()});
+    } else {
+      // Снимаем отметку — очищаем completedAt, перепланируем если дата ещё не прошла
+      if (reminder.dueDate && new Date(reminder.dueDate) > new Date()) {
+        scheduleNotification(reminder).catch(() => {});
       }
-      this.updateReminder(id, {completed: !reminder.completed});
+      this.updateReminder(id, {completed: false, completedAt: undefined});
     }
   }
 
@@ -201,7 +220,11 @@ class RemindersStore {
     const reminder = this.state.reminders.find(r => r.id === id);
     if (reminder) {
       cancelNotification(id).catch(() => {});
-      this.updateReminder(id, {archived: true, completed: true});
+      this.updateReminder(id, {
+        archived: true,
+        completed: true,
+        completedAt: reminder.completedAt ?? new Date().toISOString(),
+      });
     }
   }
 
@@ -218,6 +241,26 @@ class RemindersStore {
     }, null, 2);
   }
 
+  exportDataCSV(): string {
+    const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+    const headers = 'id,title,note,priority,dueDate,repeat,completed,completedAt,archived,createdAt,listId,locationName';
+    const rows = this.state.reminders.map(r => [
+      r.id,
+      esc(r.title),
+      esc(r.note),
+      r.priority,
+      r.dueDate ?? '',
+      r.repeat,
+      r.completed ? '1' : '0',
+      r.completedAt ?? '',
+      r.archived ? '1' : '0',
+      r.createdAt,
+      r.listId,
+      r.location ? esc(r.location.name) : '',
+    ].join(','));
+    return [headers, ...rows].join('\n');
+  }
+
   async importData(json: string): Promise<{imported: number; error?: string}> {
     try {
       const data = JSON.parse(json);
@@ -225,14 +268,15 @@ class RemindersStore {
         return {imported: 0, error: 'Неверный формат файла'};
       }
       const reminders: Reminder[] = data.reminders.map((r: any) => ({
-        archived: false, tags: [], subtasks: [], ...r,
+        archived: false, subtasks: [], ...r,
       }));
       const lists: ReminderList[] = data.lists || this.state.lists;
       this.state = {reminders, lists};
       await this.save();
       this.notify();
       return {imported: reminders.length};
-    } catch {
+    } catch (e) {
+      if (__DEV__) { console.error('[RemindersStore] importData failed:', e); }
       return {imported: 0, error: 'Не удалось прочитать JSON'};
     }
   }
@@ -253,6 +297,15 @@ class RemindersStore {
     this.state = {
       ...this.state,
       lists: [...this.state.lists, list],
+    };
+    this.save();
+    this.notify();
+  }
+
+  updateList(id: string, data: Partial<ReminderList>) {
+    this.state = {
+      ...this.state,
+      lists: this.state.lists.map(l => l.id === id ? {...l, ...data} : l),
     };
     this.save();
     this.notify();

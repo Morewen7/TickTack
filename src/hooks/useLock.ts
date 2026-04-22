@@ -14,14 +14,10 @@ export function useLock() {
   const bgTimestamp = useRef<number | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(LOCK_KEY).then(async v => {
+    AsyncStorage.getItem(LOCK_KEY).then(v => {
       const enabled = v === 'true';
       setLockEnabled(enabled);
-      if (enabled) {
-        // Only lock if biometrics are actually available
-        const {available} = await rnBiometrics.isSensorAvailable();
-        if (available) setLocked(true);
-      }
+      if (enabled) setLocked(true);
     });
   }, []);
 
@@ -32,11 +28,7 @@ export function useLock() {
         bgTimestamp.current = Date.now();
       } else if (state === 'active') {
         const elapsed = bgTimestamp.current ? Date.now() - bgTimestamp.current : Infinity;
-        if (elapsed > LOCK_TIMEOUT_MS) {
-          rnBiometrics.isSensorAvailable().then(({available}) => {
-            if (available) setLocked(true);
-          });
-        }
+        if (elapsed > LOCK_TIMEOUT_MS) setLocked(true);
         bgTimestamp.current = null;
       }
     });

@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect} from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
   Alert, Image, Modal, ScrollView, Share, StatusBar, StyleSheet,
@@ -95,19 +95,8 @@ export function SettingsScreen({navigation}: Props) {
   const [editingTime, setEditingTime] = useState(false);
   const [timeHours, setTimeHours] = useState(9);
   const [timeMinutes, setTimeMinutes] = useState(0);
-  const [currentTime, setCurrentTime] = useState(() => {
-    const now = new Date();
-    return `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  });
-
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      setCurrentTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
-    };
-    const interval = setInterval(tick, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  // Сохранённое время по умолчанию для уведомлений
+  const defaultTimeDisplay = settings.defaultTime || '09:00';
   const [newListName, setNewListName] = useState('');
   const [newListColor, setNewListColor] = useState(LIST_COLORS[0]);
   const [newListIcon, setNewListIcon] = useState(LIST_ICONS[0].name);
@@ -153,9 +142,24 @@ export function SettingsScreen({navigation}: Props) {
     ]);
   };
 
-  const handleExport = async () => {
-    const json = store.exportData();
-    await Share.share({message: json, title: 'TickTack backup'});
+  const handleExport = () => {
+    Alert.alert('Формат экспорта', 'JSON — полный бэкап с импортом обратно.\nCSV — таблица для Excel/Google Sheets.', [
+      {
+        text: 'JSON (бэкап)',
+        onPress: async () => {
+          const json = store.exportData();
+          await Share.share({message: json, title: 'TickTack backup.json'});
+        },
+      },
+      {
+        text: 'CSV (таблица)',
+        onPress: async () => {
+          const csv = store.exportDataCSV();
+          await Share.share({message: csv, title: 'TickTack data.csv'});
+        },
+      },
+      {text: 'Отмена', style: 'cancel'},
+    ]);
   };
 
   const handleImport = async () => {
@@ -271,13 +275,13 @@ export function SettingsScreen({navigation}: Props) {
           <TouchableOpacity
             style={styles.row}
             onPress={() => {
-              const now = new Date();
-              setTimeHours(now.getHours());
-              setTimeMinutes(now.getMinutes());
+              const [h, m] = (settings.defaultTime || '09:00').split(':').map(Number);
+              setTimeHours(h);
+              setTimeMinutes(m);
               setEditingTime(true);
             }}>
             <Text style={[styles.rowLabel, {color: colors.textPrimary}]}>Время по умолчанию</Text>
-            <Text style={[styles.rowValue, {color: colors.textSecondary}]}>{currentTime}</Text>
+            <Text style={[styles.rowValue, {color: colors.textSecondary}]}>{defaultTimeDisplay}</Text>
           </TouchableOpacity>
         </GlassCard>
 
@@ -312,10 +316,24 @@ export function SettingsScreen({navigation}: Props) {
               <View style={styles.listRow}>
                 <View style={[styles.listDot, {backgroundColor: list.color}]} />
                 <Text style={[styles.rowLabel, {color: colors.textPrimary}]}>{list.name}</Text>
+                {list.private && (
+                  <Icon name="lock-closed" size={13} color={colors.textMuted} style={{marginLeft: 4}} />
+                )}
               </View>
-              <TouchableOpacity onPress={() => deleteList(list.id)}>
-                <Text style={[styles.deleteText, {color: colors.priorityHigh}]}>Удалить</Text>
-              </TouchableOpacity>
+              <View style={styles.listRowActions}>
+                <TouchableOpacity
+                  onPress={() => store.updateList(list.id, {private: !list.private})}
+                  style={{marginRight: 12}}>
+                  <Icon
+                    name={list.private ? 'lock-closed' : 'lock-open-outline'}
+                    size={18}
+                    color={list.private ? colors.accent : colors.textMuted}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteList(list.id)}>
+                  <Text style={[styles.deleteText, {color: colors.priorityHigh}]}>Удалить</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
           <TouchableOpacity
@@ -355,10 +373,16 @@ export function SettingsScreen({navigation}: Props) {
             }
           />
           <Row
+            label={`Очистить выполненные (${completedCount})`}
+            borderBottom
+            onPress={completedCount > 0 ? clearCompleted : undefined}
+            right={<Text style={[styles.rowValue, {color: completedCount > 0 ? colors.priorityHigh : colors.textMuted}]}>Удалить</Text>}
+          />
+          <Row
             label="Экспорт данных"
             borderBottom
             onPress={handleExport}
-            right={<Text style={[styles.rowValue, {color: colors.textSecondary}]}>JSON</Text>}
+            right={<Text style={[styles.rowValue, {color: colors.textSecondary}]}>JSON / CSV</Text>}
           />
           <Row
             label="Импорт данных"
@@ -561,7 +585,8 @@ const styles = StyleSheet.create({
   rowLabel: {fontSize: 16},
   rowValue: {fontSize: 16},
   check: {fontSize: 16, fontWeight: '600'},
-  listRow: {flexDirection: 'row', alignItems: 'center', gap: Spacing.sm},
+  listRow: {flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1},
+  listRowActions: {flexDirection: 'row', alignItems: 'center'},
   listDot: {width: 10, height: 10, borderRadius: 5},
   deleteText: {fontSize: 14},
   importHint: {fontSize: 13, marginBottom: Spacing.sm},

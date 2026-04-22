@@ -174,7 +174,7 @@ export function ReminderItem({reminder, onPress, isFirst, onLongPress, isDraggin
           opacity,
           maxHeight: itemHeight.interpolate({
             inputRange: [0, 1],
-            outputRange: [0, 80],
+            outputRange: [0, 200],
           }),
         },
       ]}>
@@ -238,26 +238,39 @@ export function ReminderItem({reminder, onPress, isFirst, onLongPress, isDraggin
               numberOfLines={1}>
               {reminder.title}
             </Text>
+            {!!reminder.note && (
+              <Text
+                style={[styles.noteText, {color: colors.textMuted}]}
+                numberOfLines={1}>
+                {reminder.note}
+              </Text>
+            )}
             <View style={styles.meta}>
               {reminder.dueDate && (
                 <Text style={[styles.metaText, {color: colors.textMuted}]}>
                   {formatDate(reminder.dueDate)}
                 </Text>
               )}
-              {totalSubtasks > 0 && (
-                <Text style={[styles.metaText, {color: colors.textMuted}]}>
-                  {completedSubtasks}/{totalSubtasks}
-                </Text>
-              )}
-              {reminder.repeat !== 'none' && (
-                <Text style={[styles.metaText, {color: colors.textMuted}]}>↻</Text>
-              )}
-              {reminder.tags?.map(tag => (
-                <Text key={tag} style={[styles.metaText, styles.tagChip, {color: colors.textMuted, borderColor: colors.cardBorder}]}>
-                  #{tag}
-                </Text>
-              ))}
             </View>
+            {totalSubtasks > 0 && (
+              <View style={styles.subtasksList}>
+                {reminder.subtasks.slice(0, 3).map(s => (
+                  <View key={s.id} style={styles.subtaskRow}>
+                    <View style={[styles.subtaskDot, {backgroundColor: s.completed ? priorityColor : 'transparent', borderColor: priorityColor}]} />
+                    <Text
+                      style={[styles.subtaskText, {color: colors.textMuted}, s.completed && styles.subtaskDone]}
+                      numberOfLines={1}>
+                      {s.title}
+                    </Text>
+                  </View>
+                ))}
+                {totalSubtasks > 3 && (
+                  <Text style={[styles.metaText, {color: colors.textMuted, marginLeft: 14}]}>
+                    +{totalSubtasks - 3} ещё
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
 
           <View style={[styles.priorityDot, {backgroundColor: priorityColor}]} />
@@ -275,7 +288,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: 14,
+    paddingVertical: 11,
     borderBottomWidth: 1,
   },
   checkboxArea: {
@@ -302,16 +315,16 @@ const styles = StyleSheet.create({
   },
   checkmark: {fontSize: 12, fontWeight: '600'},
   content: {flex: 1},
-  title: {fontSize: 16, fontWeight: '500'},
+  title: {fontSize: 14, fontWeight: '500'},
   titleCompleted: {opacity: 0.35, textDecorationLine: 'line-through'},
+  noteText: {fontSize: 11, marginTop: 1},
+  subtasksList: {marginTop: 4, gap: 2},
+  subtaskRow: {flexDirection: 'row', alignItems: 'center', gap: 5},
+  subtaskDot: {width: 8, height: 8, borderRadius: 4, borderWidth: 1.5},
+  subtaskText: {fontSize: 12, flex: 1},
+  subtaskDone: {textDecorationLine: 'line-through', opacity: 0.5},
   meta: {flexDirection: 'row', gap: Spacing.sm, marginTop: 3},
-  metaText: {fontSize: 12},
-  tagChip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
+  metaText: {fontSize: 11},
   priorityDot: {width: 7, height: 7, borderRadius: Radius.full, marginLeft: Spacing.sm},
   actionLeft: {
     position: 'absolute',

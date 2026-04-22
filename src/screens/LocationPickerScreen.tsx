@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, StatusBar,
+  Alert, ScrollView, StatusBar,
   StyleSheet, Switch, Text, TouchableOpacity, View,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -26,6 +26,7 @@ export function LocationPickerScreen({navigation, route}: Props) {
   const [radius, setRadius] = useState(200);
   const [onArrive, setOnArrive] = useState(true);
   const [locationName, setLocationName] = useState('');
+  const [displayName, setDisplayName] = useState('');
 
   const onSave = route.params?.onSave as (loc: ReminderLocation) => void;
 
@@ -41,9 +42,37 @@ export function LocationPickerScreen({navigation, route}: Props) {
       const pos = await getCurrentLocation();
       setLocation(pos);
       setLocationName('Текущее место');
+      setDisplayName('Определяю место...');
       haptics.success();
+      // Обратное геокодирование через Nominatim (бесплатно, без ключа)
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${pos.latitude}&lon=${pos.longitude}&format=json&accept-language=ru`,
+          {headers: {'User-Agent': 'TickTack/1.0'}},
+        );
+        const data = await resp.json();
+        const city =
+          data.address?.city ||
+          data.address?.town ||
+          data.address?.village ||
+          data.address?.county ||
+          '';
+        const country = data.address?.country || '';
+        const label = city && country ? `${city}, ${country}` : city || country || 'Текущее место';
+        setDisplayName(label);
+        setLocationName(label);
+      } catch {
+        // Nominatim недоступен — показываем координаты как fallback
+        const fallback = `${pos.latitude.toFixed(5)}, ${pos.longitude.toFixed(5)}`;
+        setDisplayName(fallback);
+        setLocationName(fallback);
+      }
     } catch {
-      Alert.alert('Ошибка', 'Не удалось получить местоположение');
+      Alert.alert(
+        'Геолокация недоступна',
+        'Убедись что:\n• GPS включён в настройках телефона\n• Приложению дано разрешение на геолокацию\n• Ты находишься не в закрытом помещении',
+        [{text: 'Понятно'}],
+      );
     }
     setLoading(false);
   };
@@ -77,12 +106,9 @@ export function LocationPickerScreen({navigation, route}: Props) {
 
         <GlassCard style={styles.card}>
           <TouchableOpacity style={styles.row} onPress={pickCurrentLocation} disabled={loading}>
-            {loading
-              ? <ActivityIndicator color={colors.accent} />
-              : <Text style={[styles.locationBtn, {color: colors.accent}]}>
-                  {location ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}` : '+ Использовать текущее место'}
-                </Text>
-            }
+            <Text style={[styles.locationBtn, {color: loading ? colors.textMuted : colors.accent}]}>
+              {loading ? 'Определяем...' : location ? (displayName || 'Текущее место') : '+ Использовать текущее место'}
+            </Text>
           </TouchableOpacity>
         </GlassCard>
 

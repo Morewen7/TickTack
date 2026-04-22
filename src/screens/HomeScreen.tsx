@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useRef} from 'react';
+import ReactNativeBiometrics from 'react-native-biometrics';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
   Animated,
@@ -31,26 +32,6 @@ interface Props {
   navigation: any;
 }
 
-// Умные списки
-const SMART_LISTS = [
-  {id: 'today', name: 'Сегодня', color: '#00d4ff'},
-  {id: 'overdue', name: 'Просрочено', color: '#ff5c5c'},
-];
-
-function filterBySmartList(reminders: Reminder[], listId: string): Reminder[] {
-  const now = new Date();
-  const todayStr = now.toDateString();
-  switch (listId) {
-    case 'today':
-      return reminders.filter(r => r.dueDate && new Date(r.dueDate).toDateString() === todayStr);
-    case 'overdue':
-      return reminders.filter(r => r.dueDate && new Date(r.dueDate) < now && !r.completed);
-    case 'no-date':
-      return reminders.filter(r => !r.dueDate);
-    default:
-      return reminders;
-  }
-}
 
 function sortReminders(reminders: Reminder[], sortBy: SortOption): Reminder[] {
   return [...reminders].sort((a, b) => {
@@ -80,7 +61,6 @@ export function HomeScreen({navigation}: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('date');
-  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   // Быстрое добавление
   const [quickAddVisible, setQuickAddVisible] = useState(false);
@@ -110,7 +90,7 @@ export function HomeScreen({navigation}: Props) {
     haptics.light();
     const toValue = searchVisible ? 0 : 1;
     setSearchVisible(!searchVisible);
-    if (!searchVisible) setSearchQuery('');
+    if (searchVisible) setSearchQuery(''); // очищаем при закрытии
     Animated.spring(searchAnim, {toValue, useNativeDriver: false, friction: 8}).start();
   };
 
@@ -136,39 +116,27 @@ export function HomeScreen({navigation}: Props) {
     store.addReminder({
       title: quickTitle.trim(),
       note: '',
-      listId: SMART_LISTS.find(s => s.id === activeList) ? 'personal' : activeList,
+      listId: activeList === 'all' ? 'personal' : activeList,
       priority: 'medium',
       dueDate: null,
       repeat: 'none',
       subtasks: [],
-      tags: [],
+
       completed: false,
       archived: false,
     });
     closeQuickAdd();
   };
 
-  const isSmartList = SMART_LISTS.some(s => s.id === activeList);
-
   const baseFiltered = reminders.filter(r => {
     if (r.archived) return false;
-    if (isSmartList) {
-      const smartFiltered = filterBySmartList(reminders.filter(x => !x.archived), activeList);
-      if (!smartFiltered.find(x => x.id === r.id)) return false;
-    } else {
-      if (activeList !== 'all' && r.listId !== activeList) return false;
-    }
+    if (activeList !== 'all' && r.listId !== activeList) return false;
     const matchSearch = searchQuery
       ? r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.note.toLowerCase().includes(searchQuery.toLowerCase())
       : true;
-    const matchTag = activeTag ? r.tags?.includes(activeTag) : true;
-    return matchSearch && matchTag;
+    return matchSearch;
   });
-
-  const allTags = Array.from(
-    new Set(reminders.filter(r => !r.archived).flatMap(r => r.tags ?? [])),
-  );
 
   const filtered = sortReminders(baseFiltered.filter(r => !r.completed), sortBy);
   const completed = sortReminders(baseFiltered.filter(r => r.completed), sortBy);
@@ -176,7 +144,6 @@ export function HomeScreen({navigation}: Props) {
   const searchHeight = searchAnim.interpolate({inputRange: [0, 1], outputRange: [0, 48]});
   const quickAddY = quickAddAnim.interpolate({inputRange: [0, 1], outputRange: [200, 0]});
 
-  // Счётчик просроченных
   const overdueCount = reminders.filter(
     r => !r.archived && !r.completed && r.dueDate && new Date(r.dueDate) < new Date(),
   ).length;
@@ -194,29 +161,33 @@ export function HomeScreen({navigation}: Props) {
       <View style={[styles.container, {paddingTop: insets.top + Spacing.md}]}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptics.light(); navigation.navigate('Stats'); }}>
-            <Text style={[styles.count, {color: colors.textSecondary}]}>
-              {filtered.length} {filtered.length === 1 ? 'напоминание' : 'напоминаний'}
+          <TouchableOpacity style={styles.countWrap} onPress={() => { haptics.light(); navigation.navigate('Stats'); }}>
+            <View style={styles.countRow}>
+              <Icon name="list-outline" size={14} color={colors.textSecondary} />
+              <Text style={[styles.count, {color: colors.textSecondary}]}>{filtered.length}</Text>
               {overdueCount > 0 && (
-                <Text style={{color: colors.priorityHigh}}> · {overdueCount} просрочено</Text>
+                <>
+                  <Icon name="alert-circle" size={14} color={colors.priorityHigh} style={{marginLeft: 6}} />
+                  <Text style={[styles.count, {color: colors.priorityHigh}]}>{overdueCount}</Text>
+                </>
               )}
-            </Text>
+            </View>
           </TouchableOpacity>
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={[styles.iconBtn, {backgroundColor: searchVisible ? colors.accent : colors.card, borderColor: colors.cardBorder}]}
               onPress={toggleSearch}>
-              <Icon name="search" size={16} color={searchVisible ? colors.bg : colors.textSecondary} />
+              <Icon name="search" size={14} color={searchVisible ? colors.bg : colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.iconBtn, {backgroundColor: colors.card, borderColor: colors.cardBorder}]}
               onPress={() => { haptics.light(); navigation.navigate('Archive'); }}>
-              <Icon name="archive-outline" size={16} color={colors.textSecondary} />
+              <Icon name="archive-outline" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.iconBtn, {backgroundColor: colors.card, borderColor: colors.cardBorder}]}
               onPress={() => { haptics.light(); navigation.navigate('Settings'); }}>
-              <Icon name="settings-outline" size={16} color={colors.textSecondary} />
+              <Icon name="settings-outline" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -253,9 +224,8 @@ export function HomeScreen({navigation}: Props) {
           ]}
           onLayout={e => setTabsContainerWidth(e.nativeEvent.layout.width)}
           onContentSizeChange={w => setTabsContentWidth(w)}>
-          {[...lists, ...SMART_LISTS].map(list => {
+          {lists.map(list => {
             const isActive = activeList === list.id;
-            const isSmart = SMART_LISTS.some(s => s.id === list.id);
             return (
               <TouchableOpacity
                 key={list.id}
@@ -263,11 +233,29 @@ export function HomeScreen({navigation}: Props) {
                   styles.tab,
                   {
                     backgroundColor: isActive ? colors.accent : colors.card,
-                    borderColor: isActive ? colors.accent : isSmart ? list.color + '55' : colors.cardBorder,
+                    borderColor: isActive ? colors.accent : colors.cardBorder,
                   },
                 ]}
-                onPress={() => { haptics.light(); setActiveList(list.id); }}>
-                {(list as any).icon && !isSmart && (
+                onPress={async () => {
+                  haptics.light();
+                  if (list.private) {
+                    try {
+                      const rnBiometrics = new ReactNativeBiometrics();
+                      const {success} = await rnBiometrics.simplePrompt({
+                        promptMessage: `Открыть список "${list.name}"`,
+                        cancelButtonText: 'Отмена',
+                        allowDeviceCredentials: true,
+                      });
+                      if (!success) return;
+                      setActiveList(list.id);
+                    } catch {
+                      return;
+                    }
+                  } else {
+                    setActiveList(list.id);
+                  }
+                }}>
+                {(list as any).icon && (
                   <Icon
                     name={(list as any).icon}
                     size={12}
@@ -284,52 +272,13 @@ export function HomeScreen({navigation}: Props) {
         </ScrollView>
 
         {/* Tag Filter */}
-        {allTags.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.tagsScroll}
-            contentContainerStyle={styles.tagsContent}>
-            {allTags.map(tag => {
-              const isActive = activeTag === tag;
-              return (
-                <TouchableOpacity
-                  key={tag}
-                  style={[
-                    styles.tagChip,
-                    {
-                      backgroundColor: isActive ? colors.accent + '22' : colors.card,
-                      borderColor: isActive ? colors.accent : colors.cardBorder,
-                    },
-                  ]}
-                  onPress={() => { haptics.light(); setActiveTag(isActive ? null : tag); }}>
-                  <Text style={[styles.tagText, {color: isActive ? colors.accent : colors.textMuted}]}>
-                    #{tag}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
-
         {/* List */}
         <GlassCard style={styles.listCard}>
-          {filtered.length === 0 && completed.length === 0 && (
-            <View style={styles.empty}>
-              <Text style={[styles.emptyIcon, {color: colors.textMuted}]}>
-                {searchQuery ? '○' : activeList === 'today' ? '○' : '○'}
-              </Text>
-              <Text style={[styles.emptyText, {color: colors.textMuted}]}>
-                {searchQuery ? 'Ничего не найдено' :
-                  activeList === 'today' ? 'На сегодня всё выполнено' :
-                  activeList === 'overdue' ? 'Просроченных нет' :
-                  'Нет напоминаний'}
-              </Text>
-            </View>
-          )}
           <DraggableFlatList
             data={filtered}
             keyExtractor={item => item.id}
+            style={styles.list}
+            containerStyle={styles.list}
             renderItem={({item, drag, isActive, getIndex}) => (
               <ScaleDecorator>
                 <ReminderItem
@@ -343,38 +292,51 @@ export function HomeScreen({navigation}: Props) {
             )}
             onDragEnd={({data}) => {
               haptics.light();
-              // Сохраняем новый порядок — заменяем только видимые задачи
               const otherReminders = store.getState().reminders.filter(
-                r => !filtered.find(f => f.id === r.id)
+                r => !filtered.find(f => f.id === r.id),
               );
               store.reorderReminders([...data, ...otherReminders]);
             }}
-            scrollEnabled={false}
+            scrollEnabled
             activationDistance={10}
+            ListEmptyComponent={
+              completed.length === 0 ? (
+                <View style={styles.empty}>
+                  <Text style={[styles.emptyIcon, {color: colors.textMuted}]}>
+                    {searchQuery ? '⌕' : '○'}
+                  </Text>
+                  <Text style={[styles.emptyText, {color: colors.textMuted}]}>
+                    {searchQuery ? 'Ничего не найдено' : 'Нет напоминаний'}
+                  </Text>
+                </View>
+              ) : null
+            }
+            ListFooterComponent={
+              completed.length > 0 ? (
+                <>
+                  <View style={[styles.sectionHeader, {borderTopColor: colors.separator}]}>
+                    <Text style={[styles.sectionTitle, {color: colors.textMuted}]}>
+                      Выполнено ({completed.length})
+                    </Text>
+                  </View>
+                  {completed.map(item => (
+                    <ReminderItem
+                      key={item.id}
+                      reminder={item}
+                      onPress={id => navigation.navigate('ReminderDetail', {reminderId: id})}
+                    />
+                  ))}
+                </>
+              ) : null
+            }
           />
-          {completed.length > 0 && (
-            <>
-              <View style={[styles.sectionHeader, {borderTopColor: colors.separator}]}>
-                <Text style={[styles.sectionTitle, {color: colors.textMuted}]}>
-                  Выполнено ({completed.length})
-                </Text>
-              </View>
-              {completed.map(item => (
-                <ReminderItem
-                  key={item.id}
-                  reminder={item}
-                  onPress={id => navigation.navigate('ReminderDetail', {reminderId: id})}
-                />
-              ))}
-            </>
-          )}
         </GlassCard>
       </View>
 
       {/* FAB — долгое нажатие = быстрое добавление */}
       <TouchableOpacity
         style={[styles.fab, {backgroundColor: colors.accent, bottom: insets.bottom + Spacing.lg, shadowColor: colors.accent}]}
-        onPress={() => { haptics.medium(); navigation.navigate('AddReminder', {listId: isSmartList ? 'personal' : activeList}); }}
+        onPress={() => { haptics.medium(); navigation.navigate('AddReminder', {listId: activeList === 'all' ? 'personal' : activeList}); }}
         onLongPress={openQuickAdd}
         delayLongPress={400}>
         <Text style={[styles.fabIcon, {color: colors.bg}]}>+</Text>
@@ -449,10 +411,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.md,
   },
-  count: {fontSize: 15, fontWeight: '500'},
-  headerActions: {flexDirection: 'row', gap: Spacing.sm},
+  countWrap: {flex: 1, marginRight: Spacing.sm},
+  countRow: {flexDirection: 'row', alignItems: 'center', gap: 4},
+  count: {fontSize: 13, fontWeight: '500'},
+  headerActions: {flexDirection: 'row', gap: 6, flexShrink: 0},
   iconBtn: {
-    width: 38, height: 38, borderRadius: Radius.full,
+    width: 32, height: 32, borderRadius: Radius.full,
     borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
   searchContainer: {marginBottom: Spacing.sm},
@@ -469,20 +433,13 @@ const styles = StyleSheet.create({
   },
   tab: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: Radius.full, borderWidth: 1, gap: 5,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: Radius.full, borderWidth: 1, gap: 4,
   },
-  tabText: {fontSize: 13, fontWeight: '500'},
-  tabDot: {width: 6, height: 6, borderRadius: 3},
-  tagsScroll: {marginBottom: Spacing.sm, flexGrow: 0},
-  tagsContent: {gap: Spacing.sm, paddingHorizontal: 1, alignItems: 'center'},
-  tagChip: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: Radius.full, borderWidth: 1,
-  },
-  tagText: {fontSize: 12, fontWeight: '500'},
+  tabText: {fontSize: 12, fontWeight: '500'},
+  tabDot: {width: 5, height: 5, borderRadius: 3},
   listCard: {flex: 1},
+  list: {flex: 1},
   empty: {alignItems: 'center', paddingVertical: Spacing.xxl},
   emptyIcon: {fontSize: 36, marginBottom: Spacing.sm},
   emptyText: {fontSize: 15},

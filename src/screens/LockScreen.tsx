@@ -24,10 +24,8 @@ export function LockScreen({onUnlock}: Props) {
   useEffect(() => {
     Animated.timing(fadeIn, {toValue: 1, duration: 400, useNativeDriver: true}).start();
     rnBiometrics.isSensorAvailable().then(({available, biometryType: type}) => {
-      if (available) {
-        setBiometryType(type ?? null);
-        authenticate();
-      }
+      setBiometryType(available ? (type ?? 'Biometrics') : 'DeviceCredential');
+      authenticate();
     });
   }, []);
 
@@ -46,6 +44,7 @@ export function LockScreen({onUnlock}: Props) {
       const {success} = await rnBiometrics.simplePrompt({
         promptMessage: 'Войти в TickTack',
         cancelButtonText: 'Отмена',
+        allowDeviceCredentials: true,
       });
       if (success) {
         onUnlock();
@@ -62,7 +61,7 @@ export function LockScreen({onUnlock}: Props) {
   const biometryLabel =
     biometryType === BiometryTypes.FaceID ? 'Face ID' :
     biometryType === BiometryTypes.TouchID ? 'Touch ID' :
-    'Биометрия';
+    'Разблокировать';
 
   const biometryIcon =
     biometryType === BiometryTypes.FaceID ? '⬡' : '◉';
@@ -79,23 +78,10 @@ export function LockScreen({onUnlock}: Props) {
           <Text style={[styles.error, {color: colors.priorityHigh}]}>{error}</Text>
         )}
 
-        {biometryType ? (
-          <TouchableOpacity style={styles.bioBtn} onPress={authenticate}>
-            <Text style={[styles.bioIcon, {color: colors.accent}]}>{biometryIcon}</Text>
-            <Text style={[styles.bioLabel, {color: colors.textSecondary}]}>{biometryLabel}</Text>
-          </TouchableOpacity>
-        ) : (
-          <>
-            <Text style={[styles.noBio, {color: colors.textMuted}]}>
-              Биометрия недоступна на этом устройстве
-            </Text>
-            <TouchableOpacity
-              style={[styles.bypassBtn, {backgroundColor: colors.accent}]}
-              onPress={onUnlock}>
-              <Text style={[styles.bypassLabel, {color: colors.bg}]}>Войти</Text>
-            </TouchableOpacity>
-          </>
-        )}
+        <TouchableOpacity style={styles.bioBtn} onPress={authenticate}>
+          <Text style={[styles.bioIcon, {color: colors.accent}]}>{biometryIcon}</Text>
+          <Text style={[styles.bioLabel, {color: colors.textSecondary}]}>{biometryLabel}</Text>
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );

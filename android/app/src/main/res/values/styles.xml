@@ -3,6 +3,8 @@
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Dark background to prevent white flash on startup -->
+        <item name="android:windowBackground">#0a1628</item>
         <!-- Edge-to-edge: прозрачные системные бары -->
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>

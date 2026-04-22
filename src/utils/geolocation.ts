@@ -1,11 +1,19 @@
 import Geolocation from '@react-native-community/geolocation';
-import {Alert, PermissionsAndroid, Platform} from 'react-native';
-import {ReminderLocation} from '../store/remindersStore';
+import {PermissionsAndroid, Platform} from 'react-native';
+import type {Reminder, ReminderLocation} from '../store/remindersStore';
 
 export async function requestLocationPermission(): Promise<boolean> {
   if (Platform.OS === 'ios') {
+    // requestAuthorization показывает системный диалог.
+    // Проверяем реальный статус через короткий тестовый вызов.
     Geolocation.requestAuthorization('whenInUse');
-    return true;
+    return new Promise(resolve => {
+      Geolocation.getCurrentPosition(
+        () => resolve(true),
+        () => resolve(false),
+        {enableHighAccuracy: false, timeout: 5000, maximumAge: 60000},
+      );
+    });
   }
 
   const fine = await PermissionsAndroid.request(
@@ -19,32 +27,42 @@ export async function requestLocationPermission(): Promise<boolean> {
   );
   if (fine !== 'granted') return false;
 
-  // Android 10+ требует отдельного разрешения на фоновую геолокацию
+  // Android 10+ — фоновая геолокация опциональна, не блокируем если отказали
   if (Platform.Version >= 29) {
-    const bg = await PermissionsAndroid.request(
+    await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
       {
         title: 'Фоновая геолокация',
-        message: 'Разреши доступ к геолокации "Всегда" чтобы получать напоминания по месту в фоне',
+        message: 'Разреши "Всегда" чтобы получать напоминания по месту в фоне. Можно пропустить.',
         buttonPositive: 'Разрешить',
-        buttonNegative: 'Потом',
+        buttonNegative: 'Пропустить',
       },
     );
-    return bg === 'granted';
   }
 
-  return true;
+  return true; // Возвращаем true даже без фоновой — основная геолокация работает
 }
 
 export function getCurrentLocation(): Promise<{latitude: number; longitude: number}> {
   return new Promise((resolve, reject) => {
+    // Сначала пробуем сетевую геолокацию (быстро, работает без GPS-сигнала)
     Geolocation.getCurrentPosition(
       pos => resolve({
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
       }),
-      err => reject(err),
-      {enableHighAccuracy: true, timeout: 10000},
+      () => {
+        // Fallback: GPS с увеличенным таймаутом
+        Geolocation.getCurrentPosition(
+          pos => resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          }),
+          err => reject(err),
+          {enableHighAccuracy: true, timeout: 30000, maximumAge: 60000},
+        );
+      },
+      {enableHighAccuracy: false, timeout: 10000, maximumAge: 30000},
     );
   });
 }
@@ -66,10 +84,10 @@ export function distanceMeters(
 
 // Запускает мониторинг геозоны — вызывать при добавлении location-reminder
 let watchId: number | null = null;
-let locationCallbacks: Array<(lat: number, lon: number) => void> = [];
+let locationCallbacks: Set<(lat: number, lon: number) => void> = new Set();
 
 export function startLocationWatch(cb: (lat: number, lon: number) => void) {
-  locationCallbacks.push(cb);
+  locationCallbacks.add(cb); // Set автоматически дедуплицирует
   if (watchId !== null) return;
   watchId = Geolocation.watchPosition(
     pos => {
@@ -80,10 +98,55 @@ export function startLocationWatch(cb: (lat: number, lon: number) => void) {
   );
 }
 
-export function stopLocationWatch() {
+/**
+ * Удаляет конкретный колбэк из наблюдателей.
+ * Если передан cb — удаляет только его (watch продолжается для остальных).
+ * Без аргумента — останавливает watch полностью.
+ */
+export function stopLocationWatch(cb?: (lat: number, lon: number) => void) {
+  if (cb) {
+    locationCallbacks.delete(cb);
+    if (locationCallbacks.size > 0) return; // ещё есть слушатели — watch продолжается
+  }
   if (watchId !== null) {
     Geolocation.clearWatch(watchId);
     watchId = null;
-    locationCallbacks = [];
+    locationCallbacks.clear();
   }
+}
+
+// Геозоны которые уже сработали — сбрасываются при выходе из зоны
+const geoFired = new Set<string>();
+// Текущий обработчик монитора — для идемпотентного перезапуска
+let geofenceHandler: ((lat: number, lon: number) => void) | null = null;
+
+/**
+ * Запускает (или перезапускает) глобальный монитор геозон.
+ * Идемпотентен — безопасно вызывать повторно при добавлении новых location-напоминаний.
+ * getReminders — функция получения актуального списка напоминаний из стора.
+ * onTrigger — вызывается когда пользователь входит/выходит из геозоны напоминания.
+ */
+export function startGeofenceMonitor(
+  getReminders: () => Reminder[],
+  onTrigger: (reminder: Reminder) => void,
+) {
+  // Снимаем предыдущий обработчик если был
+  if (geofenceHandler) {
+    stopLocationWatch(geofenceHandler);
+  }
+  geofenceHandler = (lat: number, lon: number) => {
+    for (const r of getReminders()) {
+      if (r.completed || r.archived || !r.location) continue;
+      const dist = distanceMeters(lat, lon, r.location.latitude, r.location.longitude);
+      const inside = dist <= r.location.radius;
+      const shouldFire = r.location.onArrive ? inside : !inside;
+      if (shouldFire && !geoFired.has(r.id)) {
+        geoFired.add(r.id);
+        onTrigger(r);
+      } else if (!shouldFire) {
+        geoFired.delete(r.id); // сбрасываем чтобы можно было сработать снова
+      }
+    }
+  };
+  startLocationWatch(geofenceHandler);
 }
