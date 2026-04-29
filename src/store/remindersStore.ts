@@ -1,9 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {NativeModules} from 'react-native';
 import uuid from 'react-native-uuid';
-import {scheduleNotification, cancelNotification, refreshBadge} from '../utils/notifications';
-
-const {AppGroupBridge, SpotlightBridge} = NativeModules;
+import {scheduleNotification, cancelNotification} from '../utils/notifications';
+import {SCHEMA_VERSION, migrate, type LegacyReminder} from './migrations';
+import {SyncService} from '../services/SyncService';
 
 export type Priority = 'high' | 'medium' | 'low';
 export type RepeatInterval = 'none' | 'daily' | 'weekly' | 'monthly';
@@ -22,6 +21,15 @@ export interface ReminderLocation {
   onArrive: boolean; // true = при прибытии, false = при отъезде
 }
 
+export interface RepeatRule {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+  interval: number;
+  byDayOfWeek?: number[]; // 0=Sun..6=Sat
+  byDayOfMonth?: number; // 1-31
+  endDate?: string | null;
+  count?: number | null;
+}
+
 export interface Reminder {
   id: string;
   title: string;
@@ -30,6 +38,7 @@ export interface Reminder {
   priority: Priority;
   dueDate: string | null; // ISO string
   repeat: RepeatInterval;
+  repeatRule?: RepeatRule | null;
   subtasks: SubTask[];
   completed: boolean;
   archived: boolean;
@@ -66,12 +75,17 @@ class RemindersStore {
     lists: defaultLists,
   };
   private listeners: (() => void)[] = [];
+  private _saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   async load() {
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const saved = JSON.parse(raw);
+        let saved = JSON.parse(raw);
+        const version = saved.schemaVersion ?? 1;
+        if (version < SCHEMA_VERSION) {
+          saved = migrate(saved, version);
+        }
         this.state = {
           reminders: (saved.reminders || []).map((r: any) => ({
             archived: false,
@@ -79,46 +93,55 @@ class RemindersStore {
           })),
           lists: saved.lists || defaultLists,
         };
+        // Persist migrated data if version changed
+        if (version < SCHEMA_VERSION) {
+          this.saveImmediate();
+        }
       }
     } catch (e) {
-      if (__DEV__) { console.error('[RemindersStore] load failed:', e); }
+      if (__DEV__) {
+        console.error('[RemindersStore] load failed:', e);
+      }
     }
     this.notify();
   }
 
-  private async save() {
+  private save() {
+    if (this._saveTimer) {clearTimeout(this._saveTimer);}
+    this._saveTimer = setTimeout(() => {
+      this._saveTimer = null;
+      this.saveImmediate();
+    }, 300);
+  }
+
+  private async saveImmediate() {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-      this.syncWidget();
-      this.syncSpotlight();
-      refreshBadge(this.state.reminders).catch(() => {});
+      const payload = {
+        schemaVersion: SCHEMA_VERSION,
+        reminders: this.state.reminders,
+        lists: this.state.lists,
+      };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      await SyncService.syncAll(this.state.reminders);
     } catch (e) {
-      if (__DEV__) { console.error('[RemindersStore] save failed:', e); }
+      if (__DEV__) {
+        console.error('[RemindersStore] save failed:', e);
+      }
+    }
+  }
+
+  /** Flush any pending debounced save immediately. Call before app goes to background. */
+  flush() {
+    if (this._saveTimer) {
+      clearTimeout(this._saveTimer);
+      this._saveTimer = null;
+      this.saveImmediate();
     }
   }
 
   /** Принудительно отправляет актуальное состояние в виджет и Spotlight. */
   refreshSync() {
-    this.syncWidget();
-    this.syncSpotlight();
-  }
-
-  private syncWidget() {
-    try {
-      if (!AppGroupBridge) return;
-      const json = JSON.stringify({reminders: this.state.reminders});
-      AppGroupBridge.setWidgetData(json);
-    } catch {}
-  }
-
-  private syncSpotlight() {
-    try {
-      if (!SpotlightBridge) return;
-      const active = this.state.reminders.filter(r => !r.archived && !r.completed);
-      SpotlightBridge.indexReminders(JSON.stringify(
-        active.map(r => ({id: r.id, title: r.title, note: r.note, priority: r.priority}))
-      ));
-    } catch {}
+    SyncService.syncAll(this.state.reminders).catch(() => {});
   }
 
   subscribe(listener: () => void) {
@@ -130,8 +153,12 @@ class RemindersStore {
 
   private notify() {
     this.listeners.forEach(l => {
-      try { l(); } catch (e) {
-        if (__DEV__) { console.error('[RemindersStore] listener error:', e); }
+      try {
+        l();
+      } catch (e) {
+        if (__DEV__) {
+          console.error('[RemindersStore] listener error:', e);
+        }
       }
     });
   }
@@ -183,11 +210,14 @@ class RemindersStore {
 
   toggleReminder(id: string) {
     const reminder = this.state.reminders.find(r => r.id === id);
-    if (!reminder) return;
+    if (!reminder) {return;}
     if (!reminder.completed) {
       // Отмечаем выполненным — фиксируем время выполнения, отменяем уведомление
       cancelNotification(id).catch(() => {});
-      this.updateReminder(id, {completed: true, completedAt: new Date().toISOString()});
+      this.updateReminder(id, {
+        completed: true,
+        completedAt: new Date().toISOString(),
+      });
     } else {
       // Снимаем отметку — очищаем completedAt, перепланируем если дата ещё не прошла
       if (reminder.dueDate && new Date(reminder.dueDate) > new Date()) {
@@ -233,52 +263,161 @@ class RemindersStore {
   }
 
   exportData(): string {
-    return JSON.stringify({
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      reminders: this.state.reminders,
-      lists: this.state.lists,
-    }, null, 2);
+    return JSON.stringify(
+      {
+        version: 1,
+        schemaVersion: SCHEMA_VERSION,
+        exportedAt: new Date().toISOString(),
+        reminders: this.state.reminders,
+        lists: this.state.lists,
+      },
+      null,
+      2,
+    );
   }
 
   exportDataCSV(): string {
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
-    const headers = 'id,title,note,priority,dueDate,repeat,completed,completedAt,archived,createdAt,listId,locationName';
-    const rows = this.state.reminders.map(r => [
-      r.id,
-      esc(r.title),
-      esc(r.note),
-      r.priority,
-      r.dueDate ?? '',
-      r.repeat,
-      r.completed ? '1' : '0',
-      r.completedAt ?? '',
-      r.archived ? '1' : '0',
-      r.createdAt,
-      r.listId,
-      r.location ? esc(r.location.name) : '',
-    ].join(','));
+    const headers =
+      'id,title,note,priority,dueDate,repeat,completed,completedAt,archived,createdAt,listId,locationName';
+    const rows = this.state.reminders.map(r =>
+      [
+        r.id,
+        esc(r.title),
+        esc(r.note),
+        r.priority,
+        r.dueDate ?? '',
+        r.repeat,
+        r.completed ? '1' : '0',
+        r.completedAt ?? '',
+        r.archived ? '1' : '0',
+        r.createdAt,
+        r.listId,
+        r.location ? esc(r.location.name) : '',
+      ].join(','),
+    );
     return [headers, ...rows].join('\n');
   }
 
   async importData(json: string): Promise<{imported: number; error?: string}> {
     try {
-      const data = JSON.parse(json);
-      if (!data.reminders || !Array.isArray(data.reminders)) {
+      let data: unknown = JSON.parse(json);
+
+      if (
+        typeof data !== 'object' ||
+        data === null ||
+        !('reminders' in data) ||
+        !Array.isArray(data.reminders)
+      ) {
         return {imported: 0, error: 'Неверный формат файла'};
       }
-      const reminders: Reminder[] = data.reminders.map((r: any) => ({
-        archived: false, subtasks: [], ...r,
+
+      // Run migrations on imported data if needed
+      const version =
+        'schemaVersion' in data && typeof data.schemaVersion === 'number'
+          ? data.schemaVersion
+          : 1;
+      if (version < SCHEMA_VERSION) {
+        data = migrate(
+          data as {
+            reminders: LegacyReminder[];
+            schemaVersion?: number;
+            lists?: unknown[];
+          },
+          version,
+        );
+      }
+
+      const importedData = data as {
+        reminders: LegacyReminder[];
+        lists?: unknown[];
+      };
+      const reminders: Reminder[] = importedData.reminders.map(r => ({
+        id: '',
+        title: '',
+        note: '',
+        listId: 'personal',
+        priority: 'medium' as Priority,
+        dueDate: null,
+        repeat: 'none' as RepeatInterval,
+        subtasks: [],
+        completed: false,
+        archived: false,
+        createdAt: new Date().toISOString(),
+        ...r,
       }));
-      const lists: ReminderList[] = data.lists || this.state.lists;
+      const lists: ReminderList[] =
+        (importedData.lists as ReminderList[]) || this.state.lists;
       this.state = {reminders, lists};
-      await this.save();
+      await this.saveImmediate();
       this.notify();
       return {imported: reminders.length};
     } catch (e) {
-      if (__DEV__) { console.error('[RemindersStore] importData failed:', e); }
+      if (__DEV__) {
+        console.error('[RemindersStore] importData failed:', e);
+      }
       return {imported: 0, error: 'Не удалось прочитать JSON'};
     }
+  }
+
+  bulkComplete(ids: string[]) {
+    const idSet = new Set(ids);
+    const now = new Date().toISOString();
+    this.state = {
+      ...this.state,
+      reminders: this.state.reminders.map(r =>
+        idSet.has(r.id) && !r.completed
+          ? {...r, completed: true, completedAt: now}
+          : r,
+      ),
+    };
+    ids.forEach(id => cancelNotification(id).catch(() => {}));
+    this.save();
+    this.notify();
+  }
+
+  bulkDelete(ids: string[]) {
+    ids.forEach(id => cancelNotification(id).catch(() => {}));
+    const idSet = new Set(ids);
+    this.state = {
+      ...this.state,
+      reminders: this.state.reminders.filter(r => !idSet.has(r.id)),
+    };
+    this.save();
+    this.notify();
+  }
+
+  bulkArchive(ids: string[]) {
+    const idSet = new Set(ids);
+    const now = new Date().toISOString();
+    this.state = {
+      ...this.state,
+      reminders: this.state.reminders.map(r =>
+        idSet.has(r.id)
+          ? {
+              ...r,
+              archived: true,
+              completed: true,
+              completedAt: r.completedAt ?? now,
+            }
+          : r,
+      ),
+    };
+    ids.forEach(id => cancelNotification(id).catch(() => {}));
+    this.save();
+    this.notify();
+  }
+
+  bulkMoveTo(ids: string[], listId: string) {
+    const idSet = new Set(ids);
+    this.state = {
+      ...this.state,
+      reminders: this.state.reminders.map(r =>
+        idSet.has(r.id) ? {...r, listId} : r,
+      ),
+    };
+    this.save();
+    this.notify();
   }
 
   reorderReminders(reminders: Reminder[]) {
@@ -305,7 +444,7 @@ class RemindersStore {
   updateList(id: string, data: Partial<ReminderList>) {
     this.state = {
       ...this.state,
-      lists: this.state.lists.map(l => l.id === id ? {...l, ...data} : l),
+      lists: this.state.lists.map(l => (l.id === id ? {...l, ...data} : l)),
     };
     this.save();
     this.notify();
